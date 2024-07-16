@@ -1,47 +1,86 @@
 import torch
 from PIL import Image
-from yolov5.models.experimental import attempt_load
-from yolov5.utils.datasets import LoadImages
-from yolov5.utils.general import check_img_size, non_max_suppression, scale_coords
-from yolov5.utils.plots import Annotator
+import warnings
 
-class ImageProcessor:
-    def __init__(self, img_path, model_weights='yolov5l.pt', imgsz=640):
-        self.img_path = img_path
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = attempt_load(model_weights, map_location=self.device)
-        self.imgsz = check_img_size(imgsz, s=self.model.stride.max())
-        self.dataset = LoadImages(img_path, img_size=self.imgsz)
 
-    def detect_objects(self, conf_thres=0.25, iou_thres=0.45, classes=None):
-        for path, img, im0s, vid_cap in self.dataset:
-            img = torch.from_numpy(img).to(self.device)
-            img = img.float()  # uint8 to fp16/32
-            img /= 255.0  # 0 - 255 to 0.0 - 1.0
-            if img.ndimension() == 3:
-                img = img.unsqueeze(0)
+class ObjectDetector:
+    def __init__(self, model_path='yolov5s.pt', device=None):
+        """
+        Initialize the object detector with a YOLOv5 model.
 
-            # Inference
-            pred = self.model(img, augment=False)[0]
+        :param model_path: Path to the YOLOv5 model file.
+        :param device: Device to run the model on (e.g., 'cuda' for GPU).
+        """
+        self.device = device if device else ('cuda' if torch.cuda.is_available() else 'cpu')
 
-            # Apply NMS
-            pred = non_max_suppression(pred, conf_thres, iou_thres, classes=classes, agnostic=False)
+        try:
+            self.model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path).to(self.device)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load the model: {e}")
 
-            # Process detections
-            det = pred[0]
-            if det is not None and len(det):
-                # Rescale boxes from img_size to im0 size
-                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0s.shape).round()
+    def _filter_results(self, results, target_label):
+        """
+        Filter the detection results by target label.
 
-                # Print results
-                for c in det[:, -1].unique():
-                    n = (det[:, -1] == c).sum()  # detections per class
-                    s = f"{n} {self.model.names[int(c)]}{'s' * (n > 1)}"  # add to string
+        :param results: Detection results.
+        :param target_label: Label of the object to detect.
+        :return: Filtered results.
+        """
+        filtered_results = results.pandas().xyxy[0]
+        filtered_results = filtered_results[filtered_results['name'] == target_label]
+        return filtered_results
 
-                annotator = Annotator(im0s, line_width=3, example=str(self.model.names))
-                for *xyxy, conf, cls in reversed(det):
-                    label = f'{self.model.names[int(cls)]} {conf:.2f}'
-                    annotator.box_label(xyxy, label, color=Annotator.colors[int(cls), True])
+    def detect_object(self, image_path, target_label):
+        """
+        Detect a specific type of object in the given image.
 
-                im0 = annotator.result()
-                return im0
+        :param image_path: Path to the image file.
+        :param target_label: Label of the object to detect.
+        :return: Detection results for the target label.
+        """
+        try:
+            img = Image.open(image_path)
+        except IOError:
+            warnings.warn(f"Failed to open the image at {image_path}. Please check the path.")
+            return None
+
+        # Perform inference
+        results = self.model(img)
+
+        return self._filter_results(results, target_label)
+
+    def show_detections(self, image_path, target_label):
+        """
+        Display the image with bounding boxes around detected objects.
+
+        :param image_path: Path to the image file.
+        :param target_label: Label of the object to detect.
+        """
+        results = self.detect_object(image_path, target_label)
+        if results is not None:
+            results.show()
+
+    def save_detections(self, image_path, target_label, output_path):
+        """
+        Save the image with bounding boxes around detected objects to the specified path.
+
+        :param image_path: Path to the input image file.
+        :param target_label: Label of the object to detect.
+        :param output_path: Path to save the output image.
+        """
+        results = self.detect_object(image_path, target_label)
+        if results is None:
+            return
+
+        if not any(result['name'] == target_label for result in results.xyxy[0]):
+            warnings.warn(f"No detections for target label {target_label}. Skipping rendering.")
+            return
+
+        try:
+            # Render detections on the original image
+            results.render()
+
+            # Save the image with detections
+            Image.fromarray(results.ims[0]).save(output_path)
+        except Exception as e:
+            warnings.warn(f"Failed to save the detections to {output_path}: {e}")
