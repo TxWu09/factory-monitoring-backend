@@ -84,4 +84,4 @@ class ObjectDetector:
             Image.fromarray(results.ims[0]).save(output_path)
         except Exception as e:
             warnings.warn(f"Failed to save the detections to {output_path}: {e}")
-        #
+        ##
