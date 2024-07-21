@@ -1,7 +1,7 @@
 import torch
 from PIL import Image
 import warnings
-
+from ultralytics import YOLO
 
 class ObjectDetector:
     def __init__(self, model_path='yolov5s.pt', device=None):
@@ -12,9 +12,8 @@ class ObjectDetector:
         :param device: Device to run the model on (e.g., 'cuda' for GPU).
         """
         self.device = device if device else ('cuda' if torch.cuda.is_available() else 'cpu')
-
         try:
-            self.model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path).to(self.device)
+            self.model = YOLO(model_path)
         except Exception as e:
             raise RuntimeError(f"Failed to load the model: {e}")
 
@@ -45,8 +44,7 @@ class ObjectDetector:
             return None
 
         # Perform inference
-        results = self.model(img)
-
+        results = self.model(image_path)
         return self._filter_results(results, target_label)
 
     def show_detections(self, image_path, target_label):
@@ -58,7 +56,7 @@ class ObjectDetector:
         """
         results = self.detect_object(image_path, target_label)
         if results is not None:
-            results.show()
+            results[0].plot()
 
     def save_detections(self, image_path, target_label, output_path):
         """
@@ -84,4 +82,4 @@ class ObjectDetector:
             Image.fromarray(results.ims[0]).save(output_path)
         except Exception as e:
             warnings.warn(f"Failed to save the detections to {output_path}: {e}")
-        ##
+

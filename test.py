@@ -3,7 +3,7 @@ from PIL import Image
 from unittest.mock import MagicMock, patch
 
 # Import the class to be tested
-from object_detector import ImageProcessor
+from projectFile.monitor_.object_detector import ImageProcessor
 
 
 class TestImageProcessor(unittest.TestCase):
