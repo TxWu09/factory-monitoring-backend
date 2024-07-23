@@ -69,7 +69,7 @@ class VideoStreamProducer:
         """
         关闭生产者实例。
         """
-        self.producer.close()
+        self.producer.flush()
 
 
 # 配置日志记录

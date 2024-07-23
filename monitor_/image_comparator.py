@@ -1,34 +1,67 @@
-from PIL import Image
-import numpy as np
-from PIL import ImageEnhance, ImageFilter, ImageOps
+import cv2
+import os
+
 
 class ImageComparator:
     def __init__(self, path1, path2):
-        self.image1 = Image.open(path1)
-        self.image2 = Image.open(path2)
+        """
+        Initialize the comparator and process the images.
 
-        # grayscale
-        self.gray_image1 = self.image1.convert('L')
-        self.gray_image2 = self.image2.convert('L')
+        :param path1: Path of the first image.
+        :param path2: Path of the second image.
+        """
+        if not self.is_valid_path(path1) or not self.is_valid_path(path2):
+            raise ValueError("Invalid image path(s) provided.")
+
+        try:
+            # 灰度处理
+            self.image1 = self.process_image(cv2.imread(path1, cv2.IMREAD_GRAYSCALE), "image1")
+            self.image2 = self.process_image(cv2.imread(path2, cv2.IMREAD_GRAYSCALE), "image2")
+        except cv2.error as e:
+            raise IOError(f"Failed to read the image(s): {e}")
+
+    def process_image(self, image, image_name):
+        """
+        Process a single image (Histogram Equalization and Gaussian Blur).
+
+        :param image: The image to process.
+        :param image_name: The name of the image for error reporting.
+        :return: The processed image.
+        """
+        if image is None:
+            raise IOError(f"Failed to read the {image_name} image.")
 
         # Histogram Equalization
-        self.image1 = ImageOps.equalize(self.image1)
-        self.image2 = ImageOps.equalize(self.image2)
+        image = cv2.equalizeHist(image)
 
         # Gaussian Blur for noise reduction
-        self.image1 = self.image1.filter(ImageFilter.GaussianBlur(radius=1))
-        self.image2 = self.image2.filter(ImageFilter.GaussianBlur(radius=1))
-
+        image = cv2.GaussianBlur(image, (5, 5), 0)
+        return image
 
     def compare_images(self, threshold_percent):
-        img1_data = np.array(self.gray_image1)
-        img2_data = np.array(self.gray_image2)
+        """
+        Compare two images to determine if they differ by more than the specified threshold.
 
-        # absolute difference
-        diff = np.abs(img1_data - img2_data)
-        total_pixels = img1_data.size
-        differing_pixels = np.count_nonzero(diff > 0)
+        :param threshold_percent: The percentage of differing pixels allowed.
+        :return: True if the images are similar enough, False otherwise.
+        """
+        diff = cv2.absdiff(self.image1, self.image2)
+        differing_pixels = cv2.countNonZero(diff)
+        total_pixels = self.image1.shape[0] * self.image1.shape[1]
 
-        # percentage difference
+        if total_pixels == 0:
+            raise ValueError("Both images must have at least one pixel.")
+
         percent_differing = (differing_pixels / total_pixels) * 100
         return percent_differing <= threshold_percent
+
+    @staticmethod
+    def is_valid_path(path):
+        """
+        Validate the path to ensure it's safe and legal. This is a placeholder method.
+
+        :param path: The path to validate.
+        :return: True if the path is valid, False otherwise.
+        """
+        return os.path.isabs(path)
+
