@@ -3,7 +3,7 @@ from PIL import Image
 import warnings
 from ultralytics import YOLO
 
-class ObjectDetector:
+class YOLOv5Detector:
     def __init__(self, model_path='yolov5s.pt', device=None):
         """
         Initialize the object detector with a YOLOv5 model.
