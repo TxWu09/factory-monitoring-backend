@@ -2,27 +2,74 @@
 #参数 (kafka_brokers topic
 
 #先截屏再传，yolo使用示例
+
+
+#producer传过去/consumer接收
+#mySQL  docker-->端口
+
+
+import cv2
 import json
 from confluent_kafka import Producer, KafkaError
 import logging
-import cv2
+import mysql.connector
+
+
+class VideoStreamInfoProvider:
+    """
+    提供视频流信息的类，从数据库获取视频流的URL和类型。
+    """
+    def __init__(self, db_config):
+        self.db_config = db_config
+
+    def get_video_stream_info(self, video_name):
+        """
+        从数据库中获取视频流的信息。
+        """
+        connection = mysql.connector.connect(**self.db_config)
+        cursor = connection.cursor()
+        query = "SELECT stream_name, stream_url, type FROM videos WHERE stream_name=%s"
+        cursor.execute(query, (video_name,))
+        result = cursor.fetchone()
+        cursor.close()
+        connection.close()
+        if result:
+            stream_name, stream_url, video_type = result
+            return stream_name, stream_url, video_type
+        else:
+            raise ValueError(f"No video stream information found for: {video_name}")
+
+
+class VideoFrameExtractor:
+    """
+    提供视频帧的类，读取视频流并编码视频帧。
+    """
+    def get_encoded_frame(self, stream_url):
+        """
+        读取视频流的一帧并返回编码后的图像。
+        """
+        cap = cv2.VideoCapture(stream_url)
+        if not cap.isOpened():
+            raise ValueError(f"Could not open video stream: {stream_url}")
+
+        ret, frame = cap.read()
+        if not ret:
+            raise ValueError(f"Could not read frame from video stream.")
+
+        _, encoded_frame = cv2.imencode('.jpg', frame)
+        cap.release()
+        return encoded_frame.tobytes()
 
 
 class VideoStreamProducer:
     def __init__(self, kafka_brokers, topic, config=None):
         """
         初始化视频流生产者。
-
-        :param kafka_brokers: Kafka代理的地址。
-        :param topic: 发送消息的目标主题。
-        :param config: Kafka Producer的配置字典，可选。
         """
-        # 使用提供的配置参数，如果没有提供，则使用默认配置
         producer_config = {
             'bootstrap.servers': kafka_brokers,
-            'acks': 'all',  # 确保所有ISR都确认收到消息
-            'retries': 3,  # 在发送失败时重试多次
-            # 更多配置根据需要添加...
+            'acks': 'all',
+            'retries': 3,
         }
         if config:
             producer_config.update(config)
@@ -31,33 +78,19 @@ class VideoStreamProducer:
         self.topic = topic
         self.logger = logging.getLogger(__name__)
 
-    def encode_image(self, frame):
+    def send_video_info(self, video_name, video_type, encoded_frame):
         """
-        将OpenCV图像帧编码为JPEG格式的字节串。
-        """
-        _, encoded_frame = cv2.imencode('.jpg', frame)
-        return encoded_frame.tobytes()
-
-    def send_video_info(self, video_name, stream, video_type):
-        """
-        构建并发送视频信息和当前帧到指定的主题。
+        构建并发送视频信息到Kafka。
         """
         try:
-            cap = cv2.VideoCapture(stream)
-            if not cap.isOpened():
-                raise ValueError(f"Could not open video stream: {stream}")
+            # frame_provider = VideoFrameProvider(DB_CONFIG)  # DB_CONFIG 应该是包含数据库连接信息的字典
+            # encoded_frame, video_type = frame_provider.get_encoded_frame(video_name)
 
-            ret, frame = cap.read()
-            if not ret:
-                raise ValueError(f"Could not read frame from video stream: {video_name}")
-
-            encoded_frame = self.encode_image(frame)
-            video_info = {'name': video_name, 'stream': stream, 'type': video_type, 'frame': encoded_frame}
+            video_info = {'stream': video_name, 'type': video_type, 'frame': encoded_frame}
             message = json.dumps(video_info).encode('utf-8')
 
             self.producer.produce(self.topic, value=message)
             self.producer.flush()
-            cap.release()
         except KafkaError as e:
             self.logger.error(f"Failed to send video info: {e}")
             raise
@@ -71,11 +104,41 @@ class VideoStreamProducer:
         """
         self.producer.flush()
 
+    def send_info(self):
+        message = "test message"
+        self.producer.produce(self.topic, value=message)
+        self.producer.flush()
+
+
 
 # 配置日志记录
 logging.basicConfig(level=logging.INFO)
 
-# 使用示例
-# producer = VideoStreamProducer('localhost:9092', 'video_stream')
-# producer.send_video_info('test_video', 'test_stream', 'test_type')
-# producer.close()
+
+
+if __name__ == '__main__':
+    # producer = VideoStreamProducer('192.168.31.112:9092', 'video_stream')
+    # producer.send_info()
+    # producer.close()
+    # getStream = VideoFrameProvider('192.168.31.112:3306')
+    # getStream.get_encoded_frame('test')
+    # #
+    # producer = VideoStreamProducer('192.168.31.112:9092', 'video_stream')
+    # producer.send_video_info('test')
+
+    DB_CONFIG = {
+        'host': '192.168.31.112',
+        'user': 'root',
+        'password': 'my-secret-pw',
+        'database': 'mydb1'
+    }
+
+    video_name = 'ParkingLot_Copy1'
+
+    info_provider = VideoStreamInfoProvider(DB_CONFIG)
+    stream_name, stream_url, video_type = info_provider.get_video_stream_info(video_name)
+
+    frame_extractor = VideoFrameExtractor()
+    encoded_frame = frame_extractor.get_encoded_frame(stream_name)
+
+    print("Encoded frame:", encoded_frame[:10])
