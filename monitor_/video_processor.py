@@ -137,8 +137,11 @@ if __name__ == '__main__':
 
     info_provider = VideoStreamInfoProvider(DB_CONFIG)
     stream_name, stream_url, video_type = info_provider.get_video_stream_info(video_name)
+    print(stream_url)
 
     frame_extractor = VideoFrameExtractor()
-    encoded_frame = frame_extractor.get_encoded_frame(stream_name)
+    encoded_frame = frame_extractor.get_encoded_frame(stream_url)
 
     print("Encoded frame:", encoded_frame[:10])
+
+
