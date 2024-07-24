@@ -109,34 +109,30 @@ class YOLOv5Detector:
 
 def receive_kafka_messages(kafka_brokers, topic):
     consumer = Consumer({
-        'bootstrap.servers': '192.168.31.112:9092',
+        'bootstrap.servers': kafka_brokers,
         'group.id': 'my_group',
         'auto.offset.reset': 'earliest'
     })
     consumer.subscribe([topic])
-    while True:
-        msg = consumer.poll(1.0)
-        if msg is None:
-            continue
-        if msg.error():
-            if msg.error().code() == KafkaError._PARTITION_EOF:
-                print('End of partition reached')
-            else:
-                print('Error: {}'.format())
+
+    try:
+        while True:
+            msg = consumer.poll(1.0)
+            if msg is None:
                 continue
-                yield msg.value()
-                consumer.close()
-                return
+            if msg.error():
+                if msg.error().code() == KafkaError._PARTITION_EOF:
+                    print('End of partition reached')
+                else:
+                    print(f'Error: {msg.error()}')
+                continue
             yield msg.value()
-            consumer.close()
-            return
-        yield msg.value()
+    finally:
         consumer.close()
-        return
 
 
 if __name__ == '__main__':
-    consumer = receive_kafka_messages('192.168.31.112:9092', 'test')
+    consumer = receive_kafka_messages('192.168.31.112:9092', 'video_stream')
     for message in consumer:
         print(message)
 

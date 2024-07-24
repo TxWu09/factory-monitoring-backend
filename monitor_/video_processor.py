@@ -13,6 +13,8 @@ import json
 from confluent_kafka import Producer, KafkaError
 import logging
 import mysql.connector
+import numpy as np
+import pickle
 
 
 class VideoStreamInfoProvider:
@@ -78,7 +80,7 @@ class VideoStreamProducer:
         self.topic = topic
         self.logger = logging.getLogger(__name__)
 
-    def send_video_info(self, video_name, video_type, encoded_frame):
+    def send_video_info(self, video_name, video_url, encoded_frame):
         """
         构建并发送视频信息到Kafka。
         """
@@ -86,10 +88,9 @@ class VideoStreamProducer:
             # frame_provider = VideoFrameProvider(DB_CONFIG)  # DB_CONFIG 应该是包含数据库连接信息的字典
             # encoded_frame, video_type = frame_provider.get_encoded_frame(video_name)
 
-            video_info = {'stream': video_name, 'type': video_type, 'frame': encoded_frame}
-            message = json.dumps(video_info).encode('utf-8')
-
-            self.producer.produce(self.topic, value=message)
+            video_info = {'stream': video_name, 'url': video_url}
+            message_key = json.dumps(video_info)
+            self.producer.produce(self.topic, value=encoded_frame, key=message_key)
             self.producer.flush()
         except KafkaError as e:
             self.logger.error(f"Failed to send video info: {e}")
@@ -117,14 +118,6 @@ logging.basicConfig(level=logging.INFO)
 
 
 if __name__ == '__main__':
-    # producer = VideoStreamProducer('192.168.31.112:9092', 'video_stream')
-    # producer.send_info()
-    # producer.close()
-    # getStream = VideoFrameProvider('192.168.31.112:3306')
-    # getStream.get_encoded_frame('test')
-    # #
-    # producer = VideoStreamProducer('192.168.31.112:9092', 'video_stream')
-    # producer.send_video_info('test')
 
     DB_CONFIG = {
         'host': '192.168.31.112',
@@ -137,11 +130,22 @@ if __name__ == '__main__':
 
     info_provider = VideoStreamInfoProvider(DB_CONFIG)
     stream_name, stream_url, video_type = info_provider.get_video_stream_info(video_name)
-    print(stream_url)
+    # print(stream_url)
 
     frame_extractor = VideoFrameExtractor()
     encoded_frame = frame_extractor.get_encoded_frame(stream_url)
 
-    print("Encoded frame:", encoded_frame[:10])
+    # print("Encoded frame:", encoded_frame[:10])
+    decoded_frame = cv2.imdecode(np.frombuffer(encoded_frame, np.uint8), cv2.IMREAD_COLOR)
+
+    cv2.imshow('Captured Frame', decoded_frame)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    # Producer
+    producer = VideoStreamProducer('192.168.31.112:9092', 'video_stream')
+    producer.send_video_info(stream_name, stream_url, encoded_frame)
+    producer.close()
+
 
 
