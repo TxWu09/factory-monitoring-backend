@@ -14,7 +14,7 @@ from confluent_kafka import Producer, KafkaError
 import logging
 import mysql.connector
 import numpy as np
-import pickle
+
 
 
 class VideoStreamInfoProvider:
