@@ -208,7 +208,7 @@ if __name__ == '__main__':
     #     video_url = video_info.get('url')
     #     print(f'Received message: key={video_info}, value={message_value[:10]} bytes...')
 
-    # TEST: detector
+    # #TEST: detector
     detector = YOLOv5Detector(device='cuda' if torch.cuda.is_available() else 'cpu')
     target_label = 'person'
     image_path = 'example.jpg'
