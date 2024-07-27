@@ -1,13 +1,3 @@
-#视频拉流
-#参数 (kafka_brokers topic
-
-#先截屏再传，yolo使用示例
-
-
-#producer传过去/consumer接收
-#mySQL  docker-->端口
-
-
 import cv2
 import json
 from confluent_kafka import Producer, KafkaError
