@@ -18,16 +18,10 @@ import numpy as np
 
 
 class VideoStreamInfoProvider:
-    """
-    提供视频流信息的类，从数据库获取视频流的URL和类型。
-    """
     def __init__(self, db_config):
         self.db_config = db_config
 
     def get_video_stream_info(self, video_name):
-        """
-        从数据库中获取视频流的信息。
-        """
         connection = mysql.connector.connect(**self.db_config)
         cursor = connection.cursor()
         query = "SELECT stream_name, stream_url, type FROM videos WHERE stream_name=%s"
@@ -43,13 +37,7 @@ class VideoStreamInfoProvider:
 
 
 class VideoFrameExtractor:
-    """
-    提供视频帧的类，读取视频流并编码视频帧。
-    """
     def get_encoded_frame(self, stream_url):
-        """
-        读取视频流的一帧并返回编码后的图像。
-        """
         cap = cv2.VideoCapture(stream_url)
         if not cap.isOpened():
             raise ValueError(f"Could not open video stream: {stream_url}")
@@ -65,9 +53,6 @@ class VideoFrameExtractor:
 
 class VideoStreamProducer:
     def __init__(self, kafka_brokers, topic, config=None):
-        """
-        初始化视频流生产者。
-        """
         producer_config = {
             'bootstrap.servers': kafka_brokers,
             'acks': 'all',
@@ -81,13 +66,7 @@ class VideoStreamProducer:
         self.logger = logging.getLogger(__name__)
 
     def send_video_info(self, video_name, video_url, encoded_frame):
-        """
-        构建并发送视频信息到Kafka。
-        """
         try:
-            # frame_provider = VideoFrameProvider(DB_CONFIG)  # DB_CONFIG 应该是包含数据库连接信息的字典
-            # encoded_frame, video_type = frame_provider.get_encoded_frame(video_name)
-
             video_info = {'stream': video_name, 'url': video_url}
             message_key = json.dumps(video_info)
             self.producer.produce(self.topic, value=encoded_frame, key=message_key)
@@ -100,19 +79,10 @@ class VideoStreamProducer:
             raise
 
     def close(self):
-        """
-        关闭生产者实例。
-        """
-        self.producer.flush()
-
-    def send_info(self):
-        message = "test message"
-        self.producer.produce(self.topic, value=message)
         self.producer.flush()
 
 
 
-# 配置日志记录
 logging.basicConfig(level=logging.INFO)
 
 
@@ -130,12 +100,12 @@ if __name__ == '__main__':
 
     info_provider = VideoStreamInfoProvider(DB_CONFIG)
     stream_name, stream_url, video_type = info_provider.get_video_stream_info(video_name)
-    # print(stream_url)
+    print(stream_url)
 
     frame_extractor = VideoFrameExtractor()
     encoded_frame = frame_extractor.get_encoded_frame(stream_url)
 
-    # print("Encoded frame:", encoded_frame[:10])
+    print("Encoded frame:", encoded_frame[:10])
     decoded_frame = cv2.imdecode(np.frombuffer(encoded_frame, np.uint8), cv2.IMREAD_COLOR)
 
     cv2.imshow('Captured Frame', decoded_frame)
@@ -145,6 +115,7 @@ if __name__ == '__main__':
     # Producer
     producer = VideoStreamProducer('192.168.31.112:9092', 'video_stream')
     producer.send_video_info(stream_name, stream_url, encoded_frame)
+    print("sent")
     producer.close()
 
 
