@@ -6,6 +6,8 @@ from confluent_kafka import Consumer, KafkaError
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import minio
+from minio.error import S3Error
 from PIL import Image, ImageDraw, ImageFont
 
 
@@ -129,6 +131,15 @@ class YOLOv5Detector:
         plt.axis('off')
         plt.show()
 
+    def _draw_boxes(self, img, filtered_results):
+        draw = ImageDraw.Draw(img)
+        font = ImageFont.truetype("arial.ttf", size=15)  # You might need to specify the correct font path.
+        for index, row in filtered_results.iterrows():
+            xmin, ymin, xmax, ymax = row[['xmin', 'ymin', 'xmax', 'ymax']]
+            confidence = row['confidence']
+            draw.rectangle([(xmin, ymin), (xmax, ymax)], outline="blue", width=10)
+            draw.text((xmin, ymin - 10), f"{row['name']} {confidence:.2f}", fill="red", font=font)
+
     def save_detections_path(self, image_path, target_label, output_path):
         """
         Save the image with detections to the specified path.
@@ -160,18 +171,57 @@ class YOLOv5Detector:
         self._draw_boxes(img, filtered_results)
         img.save(output_path)
 
-    def _draw_boxes(self, img, filtered_results):
-        draw = ImageDraw.Draw(img)
-        font = ImageFont.truetype("arial.ttf", size=15)  # You might need to specify the correct font path.
-        for index, row in filtered_results.iterrows():
-            xmin, ymin, xmax, ymax = row[['xmin', 'ymin', 'xmax', 'ymax']]
-            confidence = row['confidence']
-            draw.rectangle([(xmin, ymin), (xmax, ymax)], outline="blue", width=10)
-            draw.text((xmin, ymin - 10), f"{row['name']} {confidence:.2f}", fill="red", font=font)
+    def save_detections_to_minio(self, video_info, img, minio_config):
+        """
+        Save the image with detections and related URL information as metadata to Minio.
 
+        :param video_info: A dictionary containing video information including 'stream', 'url', and 'capture_time'.
+        :param img: The image data (either as a PIL Image object or JPEG bytes).
+        :param minio_config: A dictionary containing Minio configuration including 'endpoint', 'access_key', 'secret_key', and 'bucket_name'.
+        """
+        # Extract necessary information from video_info
+        video_name = video_info['stream']
+        capture_time_str = video_info['capture_time']
+        video_url = video_info['url']
 
+        # Initialize Minio client
+        minio_client = minio.Minio(
+            minio_config['endpoint'],
+            access_key=minio_config['access_key'],
+            secret_key=minio_config['secret_key'],
+            secure=False # Set to False if your Minio server is not using SSL
+        )
 
+        # Construct the image file name
+        image_name = f"{video_name}.jpg"
 
+        # Convert image data to bytes if it's a PIL Image object
+        if isinstance(img, Image.Image):
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='JPEG')
+            img = img_byte_arr.getvalue()
+
+        try:
+            # Prepare the metadata
+            metadata = {
+                'capture-time': capture_time_str
+            }
+
+            # Upload the image to Minio with metadata
+            minio_client.put_object(
+                minio_config['bucket_name'],
+                image_name,
+                io.BytesIO(img),
+                len(img),
+                content_type='image/jpeg',
+                metadata=metadata
+            )
+        except S3Error as e:
+            print(f"Error occurred while uploading to Minio: {e}")
+
+    # def load_detections(self):
+#命名需要包含摄像头名称/截图的时间
+#修改消息队列，传入截图时间
 
 class KafkaMessageReceiver:
     def __init__(self, brokers, topic):
@@ -219,6 +269,13 @@ if __name__ == '__main__':
         brokers='192.168.31.112:9092',
         topic='video_stream'
     )
+    # Minio configuration
+    minio_config = {
+        'endpoint': '127.0.0.1:9000',
+        'access_key': 'minio',
+        'secret_key': 'miniosecret',
+        'bucket_name': 'videos'
+    }
 
     message = kafka_receiver.receive_message()
 
@@ -229,6 +286,7 @@ if __name__ == '__main__':
         print("Video Info:", video_info)
         print("Jpeg Data Length:", len(jpeg_data))
 
+
         # TEST: detector
         detector = YOLOv5Detector(device='cuda' if torch.cuda.is_available() else 'cpu')
         target_label = 'person'
@@ -238,7 +296,15 @@ if __name__ == '__main__':
             detector.show_detections(jpeg_data, target_label)
             output_path = 'output.jpg'
             detector.save_detections(jpeg_data, target_label, output_path)
+            detector.save_detections_to_minio(video_info, jpeg_data, minio_config)
+            print("end")
     else:
         print("No message received.")
 
     kafka_receiver.close()
+
+
+
+
+
+

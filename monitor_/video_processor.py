@@ -4,6 +4,7 @@ from confluent_kafka import Producer, KafkaError
 import logging
 import mysql.connector
 import numpy as np
+from datetime import datetime, timedelta
 
 
 
@@ -36,9 +37,10 @@ class VideoFrameExtractor:
         if not ret:
             raise ValueError(f"Could not read frame from video stream.")
 
+        current_time = datetime.now()
         _, encoded_frame = cv2.imencode('.jpg', frame)
         cap.release()
-        return encoded_frame.tobytes()
+        return current_time, encoded_frame.tobytes(),
 
 
 class VideoStreamProducer:
@@ -55,9 +57,9 @@ class VideoStreamProducer:
         self.topic = topic
         self.logger = logging.getLogger(__name__)
 
-    def send_video_info(self, video_name, video_url, encoded_frame):
+    def send_video_info(self, video_name, video_url, capture_time, encoded_frame):
         try:
-            video_info = {'stream': video_name, 'url': video_url}
+            video_info = {'stream': video_name, 'url': video_url, 'capture_time': capture_time.strftime("%Y-%m-%d %H:%M:%S")}
             message_key = json.dumps(video_info)
             self.producer.produce(self.topic, value=encoded_frame, key=message_key)
             self.producer.flush()
@@ -93,7 +95,7 @@ if __name__ == '__main__':
     print(stream_url)
 
     frame_extractor = VideoFrameExtractor()
-    encoded_frame = frame_extractor.get_encoded_frame(stream_url)
+    capture_time, encoded_frame = frame_extractor.get_encoded_frame(stream_url)
 
     print("Encoded frame:", encoded_frame[:10])
     decoded_frame = cv2.imdecode(np.frombuffer(encoded_frame, np.uint8), cv2.IMREAD_COLOR)
@@ -104,7 +106,7 @@ if __name__ == '__main__':
 
     # Producer
     producer = VideoStreamProducer('192.168.31.112:9092', 'video_stream')
-    producer.send_video_info(stream_name, stream_url, encoded_frame)
+    producer.send_video_info(stream_name, stream_url, capture_time, encoded_frame)
     print("sent")
     producer.close()
 
