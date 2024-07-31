@@ -264,44 +264,44 @@ class KafkaMessageReceiver:
         self.consumer.close()
 
 
-if __name__ == '__main__':
-    kafka_receiver = KafkaMessageReceiver(
-        brokers='192.168.31.112:9092',
-        topic='video_stream'
-    )
-    # Minio configuration
-    minio_config = {
-        'endpoint': '127.0.0.1:9000',
-        'access_key': 'minio',
-        'secret_key': 'miniosecret',
-        'bucket_name': 'videos'
-    }
-
-    message = kafka_receiver.receive_message()
-
-    # Check if a message was received
-    if message is not None:
-        video_info, jpeg_data = message
-        print("Received message:")
-        print("Video Info:", video_info)
-        print("Jpeg Data Length:", len(jpeg_data))
-
-
-        # TEST: detector
-        detector = YOLOv5Detector(device='cuda' if torch.cuda.is_available() else 'cpu')
-        target_label = 'person'
-        detection_results = detector.detect_object(jpeg_data, target_label)
-
-        if detection_results is not None:
-            detector.show_detections(jpeg_data, target_label)
-            output_path = 'output.jpg'
-            detector.save_detections(jpeg_data, target_label, output_path)
-            detector.save_detections_to_minio(video_info, jpeg_data, minio_config)
-            print("end")
-    else:
-        print("No message received.")
-
-    kafka_receiver.close()
+# if __name__ == '__main__':
+#     kafka_receiver = KafkaMessageReceiver(
+#         brokers='192.168.31.112:9092',
+#         topic='video_stream'
+#     )
+#     # Minio configuration
+#     minio_config = {
+#         'endpoint': '127.0.0.1:9000',
+#         'access_key': 'minio',
+#         'secret_key': 'miniosecret',
+#         'bucket_name': 'videos'
+#     }
+#
+#     message = kafka_receiver.receive_message()
+#
+#     # Check if a message was received
+#     if message is not None:
+#         video_info, jpeg_data = message
+#         print("Received message:")
+#         print("Video Info:", video_info)
+#         print("Jpeg Data Length:", len(jpeg_data))
+#
+#
+#         # TEST: detector
+#         detector = YOLOv5Detector(device='cuda' if torch.cuda.is_available() else 'cpu')
+#         target_label = 'person'
+#         detection_results = detector.detect_object(jpeg_data, target_label)
+#
+#         if detection_results is not None:
+#             detector.show_detections(jpeg_data, target_label)
+#             output_path = 'output.jpg'
+#             detector.save_detections(jpeg_data, target_label, output_path)
+#             detector.save_detections_to_minio(video_info, jpeg_data, minio_config)
+#             print("end")
+#     else:
+#         print("No message received.")
+#
+#     kafka_receiver.close()
 
 
 

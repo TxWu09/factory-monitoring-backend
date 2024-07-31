@@ -5,7 +5,7 @@ import logging
 import mysql.connector
 import numpy as np
 from datetime import datetime, timedelta
-
+from mysql.connector import Error
 
 
 class VideoStreamInfoProvider:
@@ -25,6 +25,27 @@ class VideoStreamInfoProvider:
             return stream_name, stream_url, video_type
         else:
             raise ValueError(f"No video stream information found for: {video_name}")
+
+    def get_all_video_streams_info(self):
+        """
+        Fetch all video streams information from the database and store it in a list.
+
+        :return: A list containing all rows from the 'videos' table.
+        """
+        connection = mysql.connector.connect(**self.db_config)
+        cursor = connection.cursor(dictionary=True)  # Use dictionary=True to get results as dictionaries
+        query = "SELECT * FROM videos"
+        cursor.execute(query)
+
+        # Fetch all rows as a list of dictionaries
+        rows = cursor.fetchall()
+
+        # Close the cursor and the connection
+        cursor.close()
+        connection.close()
+
+        return rows
+
 
 
 class VideoFrameExtractor:
@@ -57,9 +78,9 @@ class VideoStreamProducer:
         self.topic = topic
         self.logger = logging.getLogger(__name__)
 
-    def send_video_info(self, video_name, video_url, capture_time, encoded_frame):
+    def send_video_info(self, video_name, video_url, video_type, capture_time, encoded_frame):
         try:
-            video_info = {'stream': video_name, 'url': video_url, 'capture_time': capture_time.strftime("%Y-%m-%d %H:%M:%S")}
+            video_info = {'stream': video_name, 'url': video_url, 'type' : video_type, 'capture_time': capture_time.strftime("%Y-%m-%d %H:%M:%S")}
             message_key = json.dumps(video_info)
             self.producer.produce(self.topic, value=encoded_frame, key=message_key)
             self.producer.flush()
@@ -79,36 +100,36 @@ logging.basicConfig(level=logging.INFO)
 
 
 
-if __name__ == '__main__':
-
-    DB_CONFIG = {
-        'host': '192.168.31.112',
-        'user': 'root',
-        'password': 'my-secret-pw',
-        'database': 'mydb1'
-    }
-
-    video_name = 'ParkingLot_Copy1'
-
-    info_provider = VideoStreamInfoProvider(DB_CONFIG)
-    stream_name, stream_url, video_type = info_provider.get_video_stream_info(video_name)
-    print(stream_url)
-
-    frame_extractor = VideoFrameExtractor()
-    capture_time, encoded_frame = frame_extractor.get_encoded_frame(stream_url)
-
-    print("Encoded frame:", encoded_frame[:10])
-    decoded_frame = cv2.imdecode(np.frombuffer(encoded_frame, np.uint8), cv2.IMREAD_COLOR)
-
-    cv2.imshow('Captured Frame', decoded_frame)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-    # Producer
-    producer = VideoStreamProducer('192.168.31.112:9092', 'video_stream')
-    producer.send_video_info(stream_name, stream_url, capture_time, encoded_frame)
-    print("sent")
-    producer.close()
+# if __name__ == '__main__':
+#
+#     DB_CONFIG = {
+#         'host': '192.168.31.112',
+#         'user': 'root',
+#         'password': 'my-secret-pw',
+#         'database': 'mydb1'
+#     }
+#
+#     video_name = 'ParkingLot_Copy1'
+#
+#     info_provider = VideoStreamInfoProvider(DB_CONFIG)
+#     stream_name, stream_url, video_type = info_provider.get_video_stream_info(video_name)
+#     print(stream_url)
+#
+#     frame_extractor = VideoFrameExtractor()
+#     capture_time, encoded_frame = frame_extractor.get_encoded_frame(stream_url)
+#
+#     print("Encoded frame:", encoded_frame[:10])
+#     decoded_frame = cv2.imdecode(np.frombuffer(encoded_frame, np.uint8), cv2.IMREAD_COLOR)
+#
+#     cv2.imshow('Captured Frame', decoded_frame)
+#     cv2.waitKey(0)
+#     cv2.destroyAllWindows()
+#
+#     # Producer
+#     producer = VideoStreamProducer('192.168.31.112:9092', 'video_stream')
+#     producer.send_video_info(stream_name, stream_url, capture_time, encoded_frame)
+#     print("sent")
+#     producer.close()
 
 
 
