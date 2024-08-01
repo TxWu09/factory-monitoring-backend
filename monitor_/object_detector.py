@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 class YOLOv5Detector:
-    def __init__(self, model_path='yolov5s.pt', device=None):
+    def __init__(self, model_path='yolov5su.pt', device=None):
         """
         Initialize the object detector with a YOLOv5 model.
 
@@ -54,7 +54,6 @@ class YOLOv5Detector:
         filtered_results = df[df['name'] == target_label]
 
         return filtered_results
-
 
     def detect_object_path(self, image_path, target_label):
         """
@@ -214,14 +213,11 @@ class YOLOv5Detector:
                 io.BytesIO(img),
                 len(img),
                 content_type='image/jpeg',
-                metadata=metadata
+                metadata=metadata,
             )
         except S3Error as e:
             print(f"Error occurred while uploading to Minio: {e}")
 
-    # def load_detections(self):
-#命名需要包含摄像头名称/截图的时间
-#修改消息队列，传入截图时间
 
 class KafkaMessageReceiver:
     def __init__(self, brokers, topic):

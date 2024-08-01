@@ -50,6 +50,7 @@ class ImageComparator:
         percent_differing = (differing_pixels / total_pixels) * 100
         return percent_differing <= threshold_percent
 
+
 class MinioImageManager:
     def __init__(self, endpoint, access_key, secret_key, secure=False):
         self.client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
@@ -79,14 +80,14 @@ class MinioImageManager:
         :param capture_time_str: 获取时间
         """
         try:
-
+            image_name = f"{object_name}.jpg"
             metadata = {
                 'capture-time': capture_time_str
             }
 
             self.client.put_object(
                 bucket_name=bucket_name,
-                object_name=object_name,
+                object_name=image_name,
                 data=io.BytesIO(byte_data),
                 length=len(byte_data),
                 content_type='image/jpeg',
@@ -112,3 +113,7 @@ class MinioImageManager:
             else:
                 raise
 
+if __name__ == '__main__':
+   minio = MinioImageManager('127.0.0.1:9000','minio','miniosecret',False)
+   print(minio.check_image_exists('videotype1', 'example'))
+   minio.put_image('videotype1', 'example', b'123', '2023-07-01 12:00:00')
