@@ -35,7 +35,6 @@ class FullMachine:
                 message = self.kafka_receiver_video_info.receive_message()
                 if message is not None:
                     video_info, jpeg_data = message
-                    # video_info = {'stream': video_name, 'url': video_url, 'type' : video_type, 'capture_time': capture_time.strftime("%Y-%m-%d %H:%M:%S")}
                     if video_type == '1':
                         target_label = 'person'
                         detection_results_person = self.detector.detect_object(jpeg_data, target_label)
