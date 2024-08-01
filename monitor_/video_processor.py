@@ -91,6 +91,24 @@ class VideoStreamProducer:
             self.logger.error(f"Unexpected error: {e}")
             raise
 
+    def send_alarm(self, stream, alarm):
+        """
+        Send a structured message containing stream and alarm information to the Kafka queue.
+        :param stream: The stream identifier as a string.
+        :param alarm: The alarm level as an integer.
+        """
+        try:
+            message_dict = {"stream": stream, "alarm": alarm}
+            message_json = json.dumps(message_dict)
+            self.producer.produce(self.topic, value=message_json.encode('utf-8'))
+            self.producer.flush()
+        except KafkaError as e:
+            self.logger.error(f"Failed to send message: {e}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error: {e}")
+            raise
+
     def close(self):
         self.producer.flush()
 

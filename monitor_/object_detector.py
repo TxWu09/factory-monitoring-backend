@@ -209,7 +209,7 @@ class YOLOv5Detector:
 
             # Upload the image to Minio with metadata
             minio_client.put_object(
-                minio_config['bucket_name'],
+                minio_config['bucket_name1'],
                 image_name,
                 io.BytesIO(img),
                 len(img),
@@ -274,7 +274,8 @@ class KafkaMessageReceiver:
 #         'endpoint': '127.0.0.1:9000',
 #         'access_key': 'minio',
 #         'secret_key': 'miniosecret',
-#         'bucket_name': 'videos'
+#         'bucket_name1': 'video_type1'
+#         'bucket_name2': 'video_type2'
 #     }
 #
 #     message = kafka_receiver.receive_message()
