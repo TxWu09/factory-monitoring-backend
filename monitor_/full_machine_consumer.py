@@ -60,3 +60,6 @@ class FullMachineConsumer:
 
                 else:
                     print("No message received.")
+
+    # if no message, sleep()
+    # try catch keyboard interrupt
