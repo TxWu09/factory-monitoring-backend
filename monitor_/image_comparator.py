@@ -1,3 +1,5 @@
+import time
+
 import cv2
 from minio import Minio
 from minio.error import S3Error
@@ -45,45 +47,74 @@ class ImageComparator:
     #     percent_differing = (differing_pixels / total_pixels) * 100
     #     return percent_differing <= threshold_percent
 
+    def detect_different_regions(self,src_img, dst_img):
+        if src_img.shape != dst_img.shape:
+            # 调整图像尺寸，这里假设我们使用src_img的尺寸作为参考
+            dst_img = cv2.resize(dst_img, (src_img.shape[1], src_img.shape[0]))
+        # 对原始图像和目标图像进行高斯模糊，以减少噪声影响
+        src_img = cv2.GaussianBlur(src_img, [7, 7], 1)
+        dst_img = cv2.GaussianBlur(dst_img, [7, 7], 1)
 
-    bg_subtractor = cv2.createBackgroundSubtractorMOG2()
-    def compare_images(self, image1, image2, area_threshold_percent=5):
-        bg_subtractor = cv2.createBackgroundSubtractorMOG2()
-        # 使用GMM背景减除器处理图像
-        fg_mask1 = bg_subtractor.apply(image1)
-        fg_mask2 = bg_subtractor.apply(image2)
+        # 计算两张图像的差异
+        diff = cv2.absdiff(src_img, dst_img)
 
-        # 计算差异图像
-        diff = cv2.absdiff(fg_mask1, fg_mask2)
+        # 转换为灰度图
+        gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
 
-        # 进行二值化
-        _, thresh = cv2.threshold(diff, 127, 255, cv2.THRESH_BINARY)
+        # 应用阈值化，得到二值图像
+        _, result = cv2.threshold(gray, 20, 255, cv2.THRESH_BINARY)
 
-        # 形态学操作
-        kernel = np.ones((5, 5), np.uint8)
-        opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+        # 对二值图像进行膨胀，突出差异区域
+        result = cv2.dilate(result, np.ones([5, 5]))
 
-        # 寻找轮廓
-        contours, _ = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # 寻找差异区域的轮廓
+        contours, _ = cv2.findContours(result, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        areas = []
 
-        # 计算图像总面积
-        total_area = image1.shape[0] * image1.shape[1]
-        area_threshold = total_area * (area_threshold_percent / 100)
+        # 计算轮廓面积
+        for c in contours:
+            area = cv2.contourArea(c)
+            areas.append(area)
+        areas = np.array(areas)
 
-        # 筛选面积大于阈值的轮廓
-        large_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > area_threshold]
+        # 获取面积最大的5个轮廓
+        index = np.argsort(areas)[-5:]
+        top5_contours = []
+        rect_pos = []
 
-        # 绘制轮廓
-        result = image1.copy()
-        cv2.drawContours(result, large_contours, -1, (0, 255, 0), 2)
+        # 提取前5个轮廓，并获取其边界矩形的坐标
+        for i in range(5):
+            top5_contours.append(contours[index[i]])
+        for c in top5_contours:
+            # x y w h
+            rect_pos.append(cv2.boundingRect(c))
 
-        return result
+        return rect_pos
+
+    def draw_boxes(self, img, rect_pos):
+        img_copy = img.copy()
+        for pos in rect_pos:
+            x, y, w, h = pos
+            cv2.rectangle(img_copy, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        return img_copy
+
+
+
+
+
 
 if __name__ == '__main__':
    comparator = ImageComparator()
-   with open('example_sunny.jpg', 'rb') as file:
-       image1 = file.read()
-   with open('example_time_1.jpg', 'rb') as file:
-       image2 = file.read()
+   image1 = cv2.imread('example_time_1.jpg')
+   image2 = cv2.imread('example_time_2.jpg')
 
-   print(comparator.compare_images(image1, image2, 90))
+
+   # print(comparator.compare_images(image1, image2, 1))
+   results = comparator.detect_different_regions(image1, image2)
+   comparator.draw_boxes(image1, results)
+   comparator.draw_boxes(image2, results)
+
+   cv2.imshow('result1', comparator.draw_boxes(image1, results))
+   cv2.imshow('result2', comparator.draw_boxes(image2, results))
+   cv2.waitKey(0)
+
