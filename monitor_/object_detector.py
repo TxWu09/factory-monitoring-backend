@@ -13,12 +13,6 @@ from PIL import Image, ImageDraw, ImageFont
 
 class YOLOv5Detector:
     def __init__(self, model_path='yolov5su.pt', device=None):
-        """
-        Initialize the object detector with a YOLOv5 model.
-
-        :param model_path: Path to the YOLOv5 model file.
-        :param device: Device to run the model on (e.g., 'cuda' for GPU).
-        """
         self.device = device if device else ('cuda' if torch.cuda.is_available() else 'cpu')
         try:
             self.model = YOLO(model_path)
@@ -26,14 +20,6 @@ class YOLOv5Detector:
             raise RuntimeError(f"Failed to load the model: {e}")
 
     def _filter_results(self, results, target_labels):
-        """
-        Filter the detection results by target label.
-
-        :param results: Detection results.
-        :param target_label: Label of the object to detect.
-        :return: Filtered results.
-        """
-
         xyxy = results.boxes.xyxy.cpu().numpy()
         conf = results.boxes.conf.cpu().numpy()
         cls = results.boxes.cls.cpu().numpy()
@@ -55,13 +41,6 @@ class YOLOv5Detector:
         return filtered_results
 
     def detect_object(self, img, target_labels):
-        """
-        Detect a specific type of object in the given image and return the annotated image.
-
-        :param img: A PIL Image object or JPEG image data.
-        :param target_label: Label of the object to detect.
-        :return: Tuple (filtered_results, annotated_image).
-        """
         if isinstance(img, bytes):
             img = Image.open(io.BytesIO(img))
         try:
@@ -83,12 +62,6 @@ class YOLOv5Detector:
 
 
     def show_detections(self, img, target_label):
-        """
-        Show detections on the given image.
-
-        :param img: A PIL Image object or JPEG image data.
-        :param target_label: Label of the object to detect.
-        """
         if isinstance(img, bytes):
             img = Image.open(io.BytesIO(img))
 
@@ -111,13 +84,6 @@ class YOLOv5Detector:
             draw.text((xmin, ymin - 10), f"{row['name']} {confidence:.2f}", fill="red", font=font)
 
     def save_detections_path(self, image_path, target_label, output_path):
-        """
-        Save the image with detections to the specified path.
-
-        :param image_path: Path to the image file.
-        :param target_label: Label of the object to detect.
-        :param output_path: Path to save the annotated image.
-        """
         img = Image.open(image_path)
         results = self.model(image_path)
         filtered_results = self._filter_results(results[0], target_label)
@@ -125,22 +91,12 @@ class YOLOv5Detector:
         img.save(output_path)
 
     def save_detections_to_minio(self, video_info, img, detected_labels, minio_config):
-        """
-        Save the image with detections and related URL information as metadata to Minio.
-
-        :param video_info: A dictionary containing video information including 'stream', 'url', and 'capture_time'.
-        :param img: The image data (either as a PIL Image object or JPEG bytes).
-        :param minio_config: A dictionary containing Minio configuration including 'endpoint', 'access_key', 'secret_key', and 'bucket_name'.
-        """
-        # Extract necessary information from video_info
         video_name = video_info['stream']
         capture_time_str = video_info['capture_time']
 
 
         if isinstance(img, np.ndarray):
             img = Image.fromarray(img)
-
-        # Initialize Minio client
         minio_client = minio.Minio(
             minio_config['endpoint'],
             access_key=minio_config['access_key'],
@@ -152,7 +108,6 @@ class YOLOv5Detector:
             target_label_str = '_'.join(detected_labels)
         else:
             target_label_str = detected_labels
-        # Construct the image file name
         capture_time_str = capture_time_str.replace(':', '').replace(' ', '_')
         image_name = f"{video_name}_{capture_time_str}_{target_label_str}.jpg"
 
@@ -183,12 +138,6 @@ class YOLOv5Detector:
 
 class KafkaMessageReceiver:
     def __init__(self, brokers, topic):
-        """
-        Initialize the Kafka message receiver.
-
-        :param brokers: Kafka broker addresses.
-        :param topic: Kafka topic name.
-        """
         self.brokers = brokers
         self.topic = topic
 

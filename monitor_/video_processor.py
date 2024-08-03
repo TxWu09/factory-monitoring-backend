@@ -27,11 +27,6 @@ class VideoStreamInfoProvider:
             raise ValueError(f"No video stream information found for: {video_name}")
 
     def get_all_video_streams_info(self):
-        """
-        Fetch all video streams information from the database and store it in a list.
-
-        :return: A list containing all rows from the 'videos' table.
-        """
         connection = mysql.connector.connect(**self.db_config)
         cursor = connection.cursor(dictionary=True)  # Use dictionary=True to get results as dictionaries
         query = "SELECT * FROM videos"
@@ -92,11 +87,6 @@ class VideoStreamProducer:
             raise
 
     def send_alarm(self, stream, capture_time, alarm):
-        """
-        Send a structured message containing stream and alarm information to the Kafka queue.
-        :param stream: The stream identifier as a string.
-        :param alarm: The alarm level as an integer.
-        """
         try:
             message_dict = {"stream": stream,"capture_time": capture_time, "alarm": alarm}
             message_json = json.dumps(message_dict)
