@@ -52,8 +52,8 @@ class ImageComparator:
 
 
 
-
-if __name__ == '__main__':
-   minio = MinioImageManager('127.0.0.1:9000','minio','miniosecret',False)
-   print(minio.check_image_exists('videotype1', 'example'))
-   minio.put_image('videotype1', 'example', b'123', '2023-07-01 12:00:00')
+#
+# if __name__ == '__main__':
+#    minio = MinioImageManager('127.0.0.1:9000','minio','miniosecret',False)
+#    print(minio.check_image_exists('videotype1', 'example'))
+#    minio.put_image('videotype1', 'example', b'123', '2023-07-01 12:00:00')

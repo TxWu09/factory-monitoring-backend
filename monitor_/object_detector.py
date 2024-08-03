@@ -25,7 +25,7 @@ class YOLOv5Detector:
         except Exception as e:
             raise RuntimeError(f"Failed to load the model: {e}")
 
-    def _filter_results(self, results, target_label):
+    def _filter_results(self, results, target_labels):
         """
         Filter the detection results by target label.
 
@@ -39,7 +39,6 @@ class YOLOv5Detector:
         cls = results.boxes.cls.cpu().numpy()
         names = results.names
 
-        # Create a DataFrame from the data.
         df = pd.DataFrame({
             'xmin': xyxy[:, 0],
             'ymin': xyxy[:, 1],
@@ -50,66 +49,38 @@ class YOLOv5Detector:
             'name': [names[int(c)] for c in cls]
         })
 
-        # Filter the results by the target label.
-        filtered_results = df[df['name'] == target_label]
+        # Filter the results by multiple target labels.
+        filtered_results = df[df['name'].isin(target_labels)]
 
         return filtered_results
 
-    def detect_object_path(self, image_path, target_label):
+    def detect_object(self, img, target_labels):
         """
-        Detect a specific type of object in the given image.
-
-        :param image_path: Path to the image file.
-        :param target_label: Label of the object to detect.
-        :return: Detection results for the target label.
-        """
-        try:
-            img = Image.open(image_path)
-        except IOError:
-            warnings.warn(f"Failed to open the image at {image_path}. Please check the path.")
-            return None
-
-        try:
-            results = self.model(image_path)
-            return self._filter_results(results[0], target_label)
-        except Exception as e:
-            warnings.warn(f"Failed to process the image: {e}")
-            return None
-
-    def detect_object(self, img, target_label):
-        """
-        Detect a specific type of object in the given image.
+        Detect a specific type of object in the given image and return the annotated image.
 
         :param img: A PIL Image object or JPEG image data.
         :param target_label: Label of the object to detect.
-        :return: Detection results for the target label.
+        :return: Tuple (filtered_results, annotated_image).
         """
         if isinstance(img, bytes):
             img = Image.open(io.BytesIO(img))
-
         try:
             results = self.model(img)
-            return self._filter_results(results[0], target_label)
+            filtered_results = self._filter_results(results[0], target_labels)
+            if filtered_results.empty:
+                return None, [], None  # Return empty list for detected classes if no objects found.
+
+            annotated_img = img.copy()
+            self._draw_boxes(annotated_img, filtered_results)
+
+            # Get all unique detected class names from the filtered results.
+            detected_classes = filtered_results['name'].unique().tolist()
+
+            return filtered_results, detected_classes, np.array(annotated_img)
         except Exception as e:
             warnings.warn(f"Failed to process the image: {e}")
-            return None
+            return None, [], None
 
-    def show_detections_path(self, image_path, target_label):
-        """
-        Show detections on the given image.
-
-        :param image_path: Path to the image file.
-        :param target_label: Label of the object to detect.
-        """
-        img = Image.open(image_path)
-        results = self.model(image_path)
-        filtered_results = self._filter_results(results[0], target_label)
-        self._draw_boxes(img, filtered_results)
-        plt.figure(figsize=(10, 10))
-        plt.imshow(img)
-        plt.title(f"Detections for {target_label}")
-        plt.axis('off')
-        plt.show()
 
     def show_detections(self, img, target_label):
         """
@@ -153,24 +124,7 @@ class YOLOv5Detector:
         self._draw_boxes(img, filtered_results)
         img.save(output_path)
 
-    def save_detections(self, img, target_label, output_path):
-        """
-        Save the image with detections to the specified path.
-
-        :param img: A PIL Image object or JPEG image data.
-        :param target_label: Label of the object to detect.
-        :param output_path: Path to save the annotated image.
-        """
-        if isinstance(img, bytes):
-            # Convert JPEG data to PIL Image
-            img = Image.open(io.BytesIO(img))
-
-        results = self.model(img)
-        filtered_results = self._filter_results(results[0], target_label)
-        self._draw_boxes(img, filtered_results)
-        img.save(output_path)
-
-    def save_detections_to_minio(self, video_info, img, minio_config):
+    def save_detections_to_minio(self, video_info, img, detected_labels, minio_config):
         """
         Save the image with detections and related URL information as metadata to Minio.
 
@@ -181,7 +135,10 @@ class YOLOv5Detector:
         # Extract necessary information from video_info
         video_name = video_info['stream']
         capture_time_str = video_info['capture_time']
-        video_url = video_info['url']
+
+
+        if isinstance(img, np.ndarray):
+            img = Image.fromarray(img)
 
         # Initialize Minio client
         minio_client = minio.Minio(
@@ -191,8 +148,13 @@ class YOLOv5Detector:
             secure=False # Set to False if your Minio server is not using SSL
         )
 
+        if isinstance(detected_labels, list):
+            target_label_str = '_'.join(detected_labels)
+        else:
+            target_label_str = detected_labels
         # Construct the image file name
-        image_name = f"{video_name}.jpg"
+        capture_time_str = capture_time_str.replace(':', '').replace(' ', '_')
+        image_name = f"{video_name}_{capture_time_str}_{target_label_str}.jpg"
 
         # Convert image data to bytes if it's a PIL Image object
         if isinstance(img, Image.Image):
