@@ -23,8 +23,11 @@ An intelligent, real-time monitoring backend system designed to enhance safety a
 ## System Architecture
 
 Video Feed
+
 │
+
 ▼
+
 YOLO + OpenCV (Real-time CV processing)
 │
 ▼
