@@ -29,9 +29,15 @@ Video Feed
 ▼
 
 YOLO + OpenCV (Real-time CV processing)
+
 │
+
 ▼
+
 Kafka Producer (Alert Trigger)
+
 │
+
 ▼
+
 Kafka Consumer → MinIO + Database Logging
